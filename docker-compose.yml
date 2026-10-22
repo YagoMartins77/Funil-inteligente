@@ -1,0 +1,16 @@
+# PostgreSQL opcional. Uso:  docker compose up -d
+# Depois:  export DATABASE_URL=postgresql+psycopg://funil:funil@localhost:5432/funil
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: funil
+      POSTGRES_PASSWORD: funil
+      POSTGRES_DB: funil
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
