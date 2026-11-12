@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Etapa {
+  id        Int           @id @default(autoincrement())
+  ordem     Int           @unique
+  slug      String        @unique @db.VarChar(80)
+  nome      String        @db.VarChar(120)
+  descricao String        @db.VarChar(255)
+  ativa     Boolean       @default(true)
+  visitas   VisitaEtapa[]
+
+  @@map("etapas")
+}
+
+model DesfechoCatalogo {
+  id           Int           @id @default(autoincrement())
+  codigo       String        @unique @db.VarChar(40)
+  nome         String        @db.VarChar(120)
+  exigeMotivo  Boolean       @default(false) @map("exige_motivo")
+  atendimentos Atendimento[]
+
+  @@map("desfechos_catalogo")
+}
+
+model MotivoDesistencia {
+  id           Int           @id @default(autoincrement())
+  codigo       String        @unique @db.VarChar(60)
+  nome         String        @db.VarChar(150)
+  categoria    String        @db.VarChar(60)
+  atendimentos Atendimento[]
+
+  @@map("motivos_desistencia")
+}
+
+model Atendimento {
+  id                      Int                @id @default(autoincrement())
+  uuidExterno             String             @unique @map("uuid_externo") @db.VarChar(120)
+  status                  String             @default("em_andamento") @db.VarChar(40)
+  etapaAtualOrdem         Int                @default(1) @map("etapa_atual_ordem")
+  iniciadoEm              DateTime           @default(now()) @map("iniciado_em") @db.Timestamptz(3)
+  atualizadoEm            DateTime           @default(now()) @map("atualizado_em") @db.Timestamptz(3)
+  finalizadoEm            DateTime?          @map("finalizado_em") @db.Timestamptz(3)
+  tempoTotalMs            Int                @default(0) @map("tempo_total_ms")
+  tempoAtivoMs            Int                @default(0) @map("tempo_ativo_ms")
+  tempoPausaMs            Int                @default(0) @map("tempo_pausa_ms")
+  tempoEsperaOficinaMs    Int                @default(0) @map("tempo_espera_oficina_ms")
+  tempoOciosoMs           Int                @default(0) @map("tempo_ocioso_ms")
+  desfechoCodigo          String?            @map("desfecho_codigo") @db.VarChar(40)
+  motivoDesistenciaCodigo String?            @map("motivo_desistencia_codigo") @db.VarChar(60)
+  dispositivo             String             @default("tablet") @db.VarChar(40)
+  cenario                 String?            @db.VarChar(80)
+  sintetica               Boolean            @default(false)
+
+  desfecho          DesfechoCatalogo?  @relation(fields: [desfechoCodigo], references: [codigo])
+  motivoDesistencia MotivoDesistencia? @relation(fields: [motivoDesistenciaCodigo], references: [codigo])
+  visitas           VisitaEtapa[]
+  eventos           EventoTelemetria[]
+  pausas            PausaOperacional[]
+  esperasOficina    EsperaOficina[]
+
+  @@index([sintetica, iniciadoEm])
+  @@index([status])
+  @@index([desfechoCodigo])
+  @@map("atendimentos")
+}
+
+model VisitaEtapa {
+  id                   Int         @id @default(autoincrement())
+  visitaId             String      @unique @map("visita_id") @db.VarChar(120)
+  atendimentoId        Int         @map("atendimento_id")
+  etapaId              Int         @map("etapa_id")
+  etapaSlug            String      @map("etapa_slug") @db.VarChar(80)
+  ordem                Int
+  iniciadaEm           DateTime    @default(now()) @map("iniciada_em") @db.Timestamptz(3)
+  atualizadaEm         DateTime    @default(now()) @map("atualizada_em") @db.Timestamptz(3)
+  finalizadaEm         DateTime?   @map("finalizada_em") @db.Timestamptz(3)
+  tempoTotalMs         Int         @default(0) @map("tempo_total_ms")
+  tempoAtivoMs         Int         @default(0) @map("tempo_ativo_ms")
+  tempoPausaMs         Int         @default(0) @map("tempo_pausa_ms")
+  tempoEsperaOficinaMs Int         @default(0) @map("tempo_espera_oficina_ms")
+  tempoOciosoMs        Int         @default(0) @map("tempo_ocioso_ms")
+  resultado            String      @default("em_andamento") @db.VarChar(32)
+  overheadMs           Float?      @map("overhead_ms")
+  sintetica            Boolean     @default(false)
+
+  atendimento Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+  etapa       Etapa       @relation(fields: [etapaId], references: [id])
+
+  @@index([atendimentoId, ordem])
+  @@index([sintetica, etapaSlug, iniciadaEm])
+  @@map("visitas_etapa")
+}
+
+model EventoTelemetria {
+  id            Int      @id @default(autoincrement())
+  eventoId      String   @unique @map("evento_id") @db.VarChar(120)
+  atendimentoId Int      @map("atendimento_id")
+  tipo          String   @db.VarChar(60)
+  etapaOrdem    Int      @map("etapa_ordem")
+  ocorridoEm    DateTime @default(now()) @map("ocorrido_em") @db.Timestamptz(3)
+  payloadSeguro Json?    @map("payload_seguro")
+  sintetica     Boolean  @default(false)
+
+  atendimento Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+
+  @@index([atendimentoId, ocorridoEm])
+  @@index([sintetica, tipo])
+  @@map("eventos_telemetria")
+}
+
+model PausaOperacional {
+  id            Int       @id @default(autoincrement())
+  pausaId       String    @unique @map("pausa_id") @db.VarChar(120)
+  atendimentoId Int       @map("atendimento_id")
+  etapaOrdem    Int       @map("etapa_ordem")
+  motivoCodigo  String    @map("motivo_codigo") @db.VarChar(60)
+  iniciadaEm    DateTime  @default(now()) @map("iniciada_em") @db.Timestamptz(3)
+  finalizadaEm  DateTime? @map("finalizada_em") @db.Timestamptz(3)
+  duracaoMs     Int       @default(0) @map("duracao_ms")
+  sintetica     Boolean   @default(false)
+
+  atendimento Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+
+  @@index([atendimentoId, iniciadaEm])
+  @@index([sintetica])
+  @@map("pausas_operacionais")
+}
+
+model EsperaOficina {
+  id            Int       @id @default(autoincrement())
+  esperaId      String    @unique @map("espera_id") @db.VarChar(120)
+  atendimentoId Int       @map("atendimento_id")
+  etapaOrdem    Int       @map("etapa_ordem")
+  motivoCodigo  String    @map("motivo_codigo") @db.VarChar(60)
+  iniciadaEm    DateTime  @default(now()) @map("iniciada_em") @db.Timestamptz(3)
+  finalizadaEm  DateTime? @map("finalizada_em") @db.Timestamptz(3)
+  duracaoMs     Int       @default(0) @map("duracao_ms")
+  sintetica     Boolean   @default(false)
+
+  atendimento Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+
+  @@index([atendimentoId, iniciadaEm])
+  @@index([sintetica])
+  @@map("esperas_oficina")
+}
+
+model ExecucaoSimulacao {
+  id              Int      @id @default(autoincrement())
+  semente         Int
+  totalSessoes    Int      @map("total_sessoes")
+  regulares       Int
+  anomalas        Int
+  etapaAnomalia   Int      @map("etapa_anomalia")
+  precisao        Float
+  revocacao       Float
+  falsosPositivos Int      @map("falsos_positivos")
+  detalhesJson    Json     @map("detalhes_json")
+  criadoEm        DateTime @default(now()) @map("criado_em") @db.Timestamptz(3)
+
+  @@map("execucoes_simulacao")
+}
+
+model ConfiguracaoEstatistica {
+  id               Int      @id @default(1)
+  janelaPadrao     Int      @default(20) @map("janela_padrao")
+  kDesvios         Float    @default(2.0) @map("k_desvios")
+  minBaseline      Int      @default(10) @map("min_baseline")
+  minJanela        Int      @default(3) @map("min_janela")
+  timeoutAbandonoS Int      @default(1800) @map("timeout_abandono_s")
+  atualizadoEm     DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(3)
+
+  @@map("configuracoes_estatisticas")
+}

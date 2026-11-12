@@ -1,16 +1,47 @@
-# PostgreSQL opcional. Uso:  docker compose up -d
-# Depois:  export DATABASE_URL=postgresql+psycopg://funil:funil@localhost:5432/funil
 services:
   db:
-    image: postgres:16
+    image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: funil
-      POSTGRES_PASSWORD: funil
-      POSTGRES_DB: funil
+      POSTGRES_USER: ${POSTGRES_USER:-funil}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-funil}
+      POSTGRES_DB: ${POSTGRES_DB:-funil}
     ports:
       - "5432:5432"
     volumes:
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-funil} -d ${POSTGRES_DB:-funil}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-funil}:${POSTGRES_PASSWORD:-funil}@db:5432/${POSTGRES_DB:-funil}?schema=public
+      FUNIL_CORS_ORIGENS: ${FUNIL_CORS_ORIGENS:-*}
+      FUNIL_PERMITIR_ADMIN: ${FUNIL_PERMITIR_ADMIN:-1}
+      FUNIL_ADMIN_TOKEN: ${FUNIL_ADMIN_TOKEN:-}
+    ports:
+      - "3001:3001"
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist-seed/seed.js && node dist/server.js"]
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
 volumes:
   pgdata:

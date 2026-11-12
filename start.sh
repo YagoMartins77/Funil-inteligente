@@ -1,25 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$ROOT_DIR"
-
-HOST="${HOST:-0.0.0.0}"
-PORT="${PORT:-8000}"
-VENV_DIR="$ROOT_DIR/.venv"
-
-if [[ ! -d "$VENV_DIR" ]]; then
-  echo "[start] Criando ambiente virtual em $VENV_DIR"
-  python3 -m venv "$VENV_DIR"
+echo "Iniciando Funil-Inteligente FASTCAR..."
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo "Arquivo .env criado a partir de .env.example"
 fi
 
-source "$VENV_DIR/bin/activate"
-
-echo "[start] Verificando dependências"
-python -m pip install --upgrade pip >/dev/null
-if [[ -f requirements.txt ]]; then
-  python -m pip install -r requirements.txt
-fi
-
-echo "[start] Iniciando Funil Inteligente em http://$HOST:$PORT"
-exec python -m uvicorn app.main:app --host "$HOST" --port "$PORT" --reload
+docker compose up -d --build
+echo "Sistema disponível:"
+echo "  - Orçamentador Tablet: http://localhost:5173/orcamentador"
+echo "  - Dashboard Gerencial: http://localhost:5173/dashboard"
+echo "  - API REST v1:         http://localhost:3001/api/v1"
+echo "  - Swagger Docs:        http://localhost:3001/api/docs"
